@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>득근파트너 - 헬스 보조 매칭 서비스</title>
+  <!-- Google Fonts: Outfit for numbers, Inter for general text -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- App Container -->
+  <div class="app-container">
+    
+    <!-- Top Navigation Header -->
+    <header class="main-header">
+      <div class="header-logo">
+        <span class="logo-icon">⚡</span>
+        <h1>득근<span>파트너</span></h1>
+      </div>
+      
+      <div class="header-right">
+        <!-- Current User Status & Switcher -->
+        <div class="user-status-card">
+          <div class="user-info-text">
+            <span class="user-role-badge">ACTIVE</span>
+            <span class="user-name" id="header-user-name">김헬스</span>
+            <span class="user-points"><strong id="header-user-points">0</strong> P</span>
+          </div>
+          
+          <div class="user-switcher-container">
+            <label for="user-switcher" class="sr-only">유저 전환</label>
+            <select id="user-switcher" class="user-select-dropdown">
+              <!-- Dynamically populated -->
+            </select>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="main-content">
+      
+      <!-- Left Sidebar: Profile Details -->
+      <section class="sidebar-section">
+        <div class="profile-card glass-panel">
+          <div class="profile-avatar">🏋️‍♂️</div>
+          <h2 class="profile-title" id="profile-user-id">@user_kim</h2>
+          
+          <div class="profile-stats">
+            <div class="stat-item">
+              <div class="stat-label">소속 헬스장</div>
+              <div class="stat-value" id="profile-gym">마블 피트니스</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">삼대중량</div>
+              <div class="stat-value highlight" id="profile-weight">350kg</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">선호 운동 시간</div>
+              <div class="stat-value" id="profile-time">18:00</div>
+            </div>
+          </div>
+
+          <button id="edit-profile-btn" class="btn btn-secondary btn-full">내 프로필 수정</button>
+        </div>
+
+        <!-- Banner Info -->
+        <div class="info-card glass-panel">
+          <h3>💪 포인트 적립 및 정산</h3>
+          <p>파트너를 구하는 글에 댓글을 달아 <strong>보조(Spotting)</strong>를 수행해보세요. 글 작성자가 완료 처리 시 <strong>100 포인트</strong>가 지급됩니다!</p>
+          <div class="info-badge">보조 1회 완료 = 100 P</div>
+        </div>
+      </section>
+
+      <!-- Right Main: Board Listing & Filters -->
+      <section class="board-section">
+        
+        <!-- Controls Bar -->
+        <div class="board-controls-bar glass-panel">
+          <div class="filter-group">
+            <label class="toggle-switch">
+              <input type="checkbox" id="time-match-toggle">
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">내 시간대 매칭만 보기 (±1시간)</span>
+          </div>
+
+          <div class="sorting-group">
+            <span class="sort-title">정렬 기준</span>
+            <div class="sort-options">
+              <button class="sort-btn active" data-sort="latest">최신순</button>
+              <button class="sort-btn" data-sort="highest">삼대 중량 높은순</button>
+              <button class="sort-btn" data-sort="similar">나와 비슷한 중량순</button>
+            </div>
+          </div>
+
+          <button id="new-post-btn" class="btn btn-primary">
+            <span class="btn-icon">+</span> 파트너 요청하기
+          </button>
+        </div>
+
+        <!-- Gym Info Bar -->
+        <div class="gym-info-banner">
+          <span class="gym-badge">현재 헬스장</span>
+          <span class="gym-name-text" id="board-gym-name">마블 피트니스</span>
+          <span class="gym-info-desc">소속 헬스장이 일치하는 파트너 모집 글만 노출됩니다.</span>
+        </div>
+
+        <!-- Post Cards Container -->
+        <div class="posts-container" id="posts-container">
+          <!-- Dynamic post cards populate here -->
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- Modal: Edit Profile -->
+  <div id="profile-modal" class="modal-overlay hidden">
+    <div class="modal-content glass-panel animated-scale">
+      <div class="modal-header">
+        <h2>내 프로필 수정</h2>
+        <button class="close-btn" id="close-profile-modal">&times;</button>
+      </div>
+      <form id="profile-form" class="modal-form">
+        <div class="form-group">
+          <label for="edit-gym">소속 헬스장</label>
+          <input type="text" id="edit-gym" required placeholder="예: 마블 피트니스">
+        </div>
+        <div class="form-group">
+          <label for="edit-weight">삼대중량 (kg)</label>
+          <input type="number" id="edit-weight" required min="0" max="1000" placeholder="예: 350">
+        </div>
+        <div class="form-group">
+          <label for="edit-time">선호 운동 시간</label>
+          <input type="time" id="edit-time" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="cancel-profile-btn">취소</button>
+          <button type="submit" class="btn btn-primary">저장하기</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Write Post -->
+  <div id="post-modal" class="modal-overlay hidden">
+    <div class="modal-content glass-panel animated-scale">
+      <div class="modal-header">
+        <h2>파트너 매칭 글쓰기</h2>
+        <button class="close-btn" id="close-post-modal">&times;</button>
+      </div>
+      <form id="post-form" class="modal-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="post-workout">운동 종목</label>
+            <select id="post-workout" required>
+              <option value="스쿼트">스쿼트 🏋️‍♂️</option>
+              <option value="벤치프레스">벤치프레스 🏋️‍♀️</option>
+              <option value="데드리프트">데드리프트 🎚️</option>
+              <option value="밀리터리 프레스">밀리터리 프레스 🦾</option>
+              <option value="어깨/팔">어깨/팔 💪</option>
+              <option value="등/바벨로우">등/바벨로우 🪽</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="post-weight">목표 무게 (kg)</label>
+            <input type="number" id="post-weight" required placeholder="예: 100">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="post-sets">요청 세트</label>
+            <input type="text" id="post-sets" required placeholder="예: 5세트">
+          </div>
+          <div class="form-group">
+            <label for="post-time">약속 시간</label>
+            <input type="time" id="post-time" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="post-location">상세 장소</label>
+          <input type="text" id="post-location" required placeholder="예: 파워랙 2번 구역, 스미스머신 앞">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="cancel-post-btn">취소</button>
+          <button type="submit" class="btn btn-primary">등록하기</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Post Detail & Comments -->
+  <div id="detail-modal" class="modal-overlay hidden">
+    <div class="modal-content detail-modal-content glass-panel animated-scale">
+      <div class="modal-header">
+        <div class="detail-header-info">
+          <span class="status-badge" id="detail-status">대기중</span>
+          <h2 id="detail-workout-title">스쿼트 파트너 구합니다</h2>
+        </div>
+        <button class="close-btn" id="close-detail-modal">&times;</button>
+      </div>
+
+      <div class="detail-grid">
+        <!-- Post Information Card -->
+        <div class="detail-info-card">
+          <div class="info-grid">
+            <div class="info-cell">
+              <span class="cell-label">작성자</span>
+              <span class="cell-val" id="detail-author">@user_park</span>
+            </div>
+            <div class="info-cell">
+              <span class="cell-label">작성자 삼대중량</span>
+              <span class="cell-val highlight" id="detail-author-weight">380kg</span>
+            </div>
+            <div class="info-cell">
+              <span class="cell-label">목표 무게 / 세트</span>
+              <span class="cell-val" id="detail-weight-sets">140kg / 5세트</span>
+            </div>
+            <div class="info-cell">
+              <span class="cell-label">약속 시간</span>
+              <span class="cell-val highlight-lime" id="detail-promise-time">18:00</span>
+            </div>
+            <div class="info-cell full-width">
+              <span class="cell-label">상세 장소</span>
+              <span class="cell-val" id="detail-location">프리웨이트존 파워랙 2번</span>
+            </div>
+          </div>
+
+          <!-- Reward Assistant Section (Visible to Author only) -->
+          <div id="author-action-panel" class="author-panel glass-inner hidden">
+            <h4>🤝 보조 완료 및 포인트 지급</h4>
+            <p>댓글을 남긴 유저 중 실제 운동을 도와준 보조 파트너를 선택하여 완료 처리하세요. 파트너에게 100P가 적립됩니다.</p>
+            <div class="complete-action-row">
+              <select id="assistant-select" class="user-select-dropdown">
+                <option value="">보조 파트너 선택...</option>
+              </select>
+              <button id="complete-btn" class="btn btn-success">보조 완료 & 포인트 정산</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Comments Section -->
+        <div class="comments-section-container">
+          <h3>💬 댓글 및 소통 (<span id="detail-comment-count">0</span>)</h3>
+          
+          <!-- Comments List -->
+          <div class="comments-list" id="comments-list">
+            <!-- Dynamic comments -->
+          </div>
+
+          <!-- Write Comment Form -->
+          <form id="comment-form" class="comment-write-form">
+            <textarea id="comment-content" required placeholder="매칭 신청을 위해 약속 및 격려의 메시지를 남겨보세요..." rows="2"></textarea>
+            <button type="submit" class="btn btn-primary btn-sm">댓글 등록</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
