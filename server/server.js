@@ -44,6 +44,10 @@ async function adjustPopularity(userId, points) {
     console.error('adjustPopularity error:', err.message);
   }
 }
+app.use((req, res, next) => {
+  console.log("🔥 REQUEST:", req.method, req.url);
+  next();
+});
 
 // 알림 생성 및 실시간 전송 헬퍼 함수
 async function createNotification(userId, type, title, content) {
