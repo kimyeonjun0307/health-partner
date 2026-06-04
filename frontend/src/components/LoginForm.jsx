@@ -17,7 +17,7 @@ function LoginForm({ onLoginSuccess, onSwitchToRegister }) {
     setLoading(true);
 
     try {
-      const response = await fetch('health-partner-production.up.railway.app', {
+      const response = await fetch('https://health-partner-production.up.railway.app/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
