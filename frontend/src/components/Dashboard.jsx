@@ -356,7 +356,7 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   useEffect(() => {
     if (!currentUser || !currentUser.userId) return;
 
-    const newSocket = io('http://localhost:3000', {
+    const newSocket = io('https://health-partner-production.up.railway.app/', {
       query: { userId: currentUser.userId }
     });
 
