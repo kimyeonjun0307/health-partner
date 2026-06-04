@@ -53,7 +53,7 @@ async function createNotification(userId, type, title, content) {
       [userId, type, title, content]
     );
     const notiId = result.lastID;
-    
+
     // 실시간 소켓 브로드캐스팅
     io.to(`user_${userId}`).emit('notification', {
       id: notiId,
@@ -98,7 +98,7 @@ io.on('connection', (socket) => {
         [room_id, sender_id, message]
       );
       const msgId = result.lastID;
-      
+
       const savedMsg = {
         id: msgId,
         room_id,
@@ -108,18 +108,22 @@ io.on('connection', (socket) => {
         is_read: 0
       };
 
-      // 룸 내 모든 소켓에 메시지 전송
-      io.to(`room_${room_id}`).emit('receive_message', savedMsg);
+      const targetId =
+        room.owner_id === sender_id
+          ? room.participant_id
+          : room.owner_id;
 
-      // 상대방 유저에게 안읽은 메시지 수 갱신 알림 전송
-      const room = await dbGet('SELECT * FROM chat_rooms WHERE id = ?', [room_id]);
-      if (room) {
-        const targetId = room.owner_id === sender_id ? room.participant_id : room.owner_id;
-        io.to(`user_${targetId}`).emit('new_message_alert', { room_id, message });
-        
-        // 실시간 새 채팅 알림 발행
-        await createNotification(targetId, '새 채팅', '새로운 메시지', `${sender_id}: ${message}`);
-      }
+      io.to(`user_${targetId}`).emit('new_message_alert', {
+        room_id,
+        message
+      });
+
+      await createNotification(
+        targetId,
+        '새 채팅',
+        '새로운 메시지',
+        `${sender_id}: ${message}`
+      );
     } catch (err) {
       console.error('Socket send_message error:', err.message);
     }
@@ -280,7 +284,7 @@ async function getRegionFromCoordsOrAddress(lat, lng, address) {
 app.get('/api/auth/me', authenticateJWT, async (req, res) => {
   try {
     const user = await dbGet(
-      'SELECT userId, gymName, threeLiftWeight, preferredWorkoutTime, points, user_region, user_gym, user_lat, user_lng, popularity_score, workout_count, received_reviews_count, nickname, bench_press, squat, deadlift, workout_career, profile_image FROM User WHERE userId = ?', 
+      'SELECT userId, gymName, threeLiftWeight, preferredWorkoutTime, points, user_region, user_gym, user_lat, user_lng, popularity_score, workout_count, received_reviews_count, nickname, bench_press, squat, deadlift, workout_career, profile_image FROM User WHERE userId = ?',
       [req.user.userId]
     );
     if (!user) {
@@ -322,9 +326,9 @@ app.post('/api/region/authenticate', authenticateJWT, async (req, res) => {
       'SELECT userId, gymName, threeLiftWeight, preferredWorkoutTime, points, user_region, user_gym, user_lat, user_lng FROM User WHERE userId = ?',
       [req.user.userId]
     );
-    
+
     if (updatedUser.user_gym) {
-      try { updatedUser.user_gym = JSON.parse(updatedUser.user_gym); } catch (e) {}
+      try { updatedUser.user_gym = JSON.parse(updatedUser.user_gym); } catch (e) { }
     }
 
     res.json({
@@ -475,7 +479,7 @@ app.post('/api/users/gym', authenticateJWT, async (req, res) => {
     );
 
     if (updatedUser.user_gym) {
-      try { updatedUser.user_gym = JSON.parse(updatedUser.user_gym); } catch (e) {}
+      try { updatedUser.user_gym = JSON.parse(updatedUser.user_gym); } catch (e) { }
     }
 
     res.json({
@@ -501,9 +505,9 @@ app.get('/api/users', authenticateJWT, async (req, res) => {
 // Update user details (to test dynamic filtering changes)
 app.put('/api/users/:id', authenticateJWT, async (req, res) => {
   try {
-    const { 
-      gymName, preferredWorkoutTime, nickname, 
-      bench_press, squat, deadlift, workout_career, profile_image 
+    const {
+      gymName, preferredWorkoutTime, nickname,
+      bench_press, squat, deadlift, workout_career, profile_image
     } = req.body;
     const userId = req.params.id;
 
@@ -524,9 +528,9 @@ app.put('/api/users/:id', authenticateJWT, async (req, res) => {
     const finalDeadlift = deadlift !== undefined ? Number(deadlift) : user.deadlift;
     const finalWorkoutCareer = workout_career !== undefined ? workout_career : user.workout_career;
     const finalProfileImage = profile_image !== undefined ? profile_image : user.profile_image;
-    
-    const finalThreeLift = (bench_press !== undefined || squat !== undefined || deadlift !== undefined) 
-      ? (finalBenchPress + finalSquat + finalDeadlift) 
+
+    const finalThreeLift = (bench_press !== undefined || squat !== undefined || deadlift !== undefined)
+      ? (finalBenchPress + finalSquat + finalDeadlift)
       : user.threeLiftWeight;
 
     await dbRun(
@@ -546,12 +550,12 @@ app.put('/api/users/:id', authenticateJWT, async (req, res) => {
       `SELECT userId, nickname, gymName, threeLiftWeight, bench_press, squat, deadlift, 
               workout_career, profile_image, points, user_region, user_gym, user_lat, user_lng, 
               popularity_score, workout_count, received_reviews_count 
-       FROM User WHERE userId = ?`, 
+       FROM User WHERE userId = ?`,
       [userId]
     );
 
     if (updatedUser.user_gym) {
-      try { updatedUser.user_gym = JSON.parse(updatedUser.user_gym); } catch (e) {}
+      try { updatedUser.user_gym = JSON.parse(updatedUser.user_gym); } catch (e) { }
     }
 
     res.json(updatedUser);
@@ -582,7 +586,7 @@ setInterval(async () => {
 app.get('/api/posts', authenticateJWT, async (req, res) => {
   try {
     const currentUserId = req.user.userId;
-    
+
     // 현재 로그인한 유저 정보 조회
     const user = await dbGet('SELECT * FROM User WHERE userId = ?', [currentUserId]);
     if (!user) {
@@ -591,14 +595,14 @@ app.get('/api/posts', authenticateJWT, async (req, res) => {
 
     // [Ver.2 Guard] 동네 인증 및 헬스장 등록 여부 확인
     if (!user.user_region || !user.user_gym) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: '동네 인증 및 헬스장 등록을 완료하지 않으면 글을 조회하거나 작성할 수 없습니다.',
         unauthorizedReason: 'LOCATION_REQUIRED'
       });
     }
 
     const { category, timeMatch, sortBy } = req.query;
-    
+
     // 필수 보안 규칙: 내 동네(user_region)와 같은 글만 조회
     let sql = `
       SELECT 
@@ -645,7 +649,7 @@ app.get('/api/posts', authenticateJWT, async (req, res) => {
 
     let parsedGym = null;
     if (user.user_gym) {
-      try { parsedGym = JSON.parse(user.user_gym); } catch (e) {}
+      try { parsedGym = JSON.parse(user.user_gym); } catch (e) { }
     }
 
     res.json({
@@ -748,13 +752,13 @@ app.get('/api/posts/:id', authenticateJWT, async (req, res) => {
 app.post('/api/posts', authenticateJWT, async (req, res) => {
   try {
     const currentUserId = req.user.userId;
-    const { 
-      title, content, category, max_members, workout_time, 
-      workoutType, targetWeight, requestedSets, promiseTime, detailedLocation 
+    const {
+      title, content, category, max_members, workout_time,
+      workoutType, targetWeight, requestedSets, promiseTime, detailedLocation
     } = req.body;
 
     if (!title || !content || !category || !max_members || !workout_time ||
-        !workoutType || !targetWeight || !requestedSets || !promiseTime || !detailedLocation) {
+      !workoutType || !targetWeight || !requestedSets || !promiseTime || !detailedLocation) {
       return res.status(400).json({ error: '필수 작성 칸이 비어있습니다.' });
     }
 
@@ -775,7 +779,7 @@ app.post('/api/posts', authenticateJWT, async (req, res) => {
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, '대기중', ?, ?, ?, ?, 'recruiting', ?, 1, ?)
     `, [
-      currentUserId, user.gymName, workoutType, Number(targetWeight), requestedSets, promiseTime, detailedLocation, 
+      currentUserId, user.gymName, workoutType, Number(targetWeight), requestedSets, promiseTime, detailedLocation,
       user.user_region, title, content, category, Number(max_members), workout_time
     ]);
 
@@ -931,7 +935,7 @@ app.post('/api/applications/:id/status', authenticateJWT, async (req, res) => {
       }
 
       await dbRun('UPDATE post_applications SET status = ? WHERE id = ?', [status, applicationId]);
-      
+
       const newCurrentMembers = post.current_members + 1;
       let newRecruitStatus = post.recruit_status;
       if (newCurrentMembers >= post.max_members) {
@@ -945,7 +949,7 @@ app.post('/api/applications/:id/status', authenticateJWT, async (req, res) => {
         'SELECT id FROM chat_rooms WHERE post_id = ? AND owner_id = ? AND participant_id = ?',
         [application.post_id, application.owner_id, application.applicant_id]
       );
-      
+
       let roomId;
       if (!existingRoom) {
         const roomResult = await dbRun(
@@ -959,14 +963,14 @@ app.post('/api/applications/:id/status', authenticateJWT, async (req, res) => {
 
       // [알림 발송]
       await createNotification(
-        application.applicant_id, 
-        '승인', 
-        '참가 신청 승인', 
+        application.applicant_id,
+        '승인',
+        '참가 신청 승인',
         `'${post.title}' 모집글 참가 신청이 승인되어 채팅방이 개설되었습니다.`
       );
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         message: '신청을 승인했습니다. 채팅방이 자동으로 개설되었습니다.',
         current_members: newCurrentMembers,
         recruit_status: newRecruitStatus,
@@ -974,12 +978,12 @@ app.post('/api/applications/:id/status', authenticateJWT, async (req, res) => {
       });
     } else {
       await dbRun('UPDATE post_applications SET status = ? WHERE id = ?', [status, applicationId]);
-      
+
       // [거절 알림 발송]
       await createNotification(
-        application.applicant_id, 
-        '거절', 
-        '참가 신청 거절', 
+        application.applicant_id,
+        '거절',
+        '참가 신청 거절',
         `보내신 참가 신청이 거절되었습니다.`
       );
 
@@ -1150,7 +1154,7 @@ app.get('/api/chats/rooms/:roomId/messages', authenticateJWT, async (req, res) =
   try {
     const roomId = req.params.roomId;
     const currentUserId = req.user.userId;
-    
+
     const room = await dbGet('SELECT * FROM chat_rooms WHERE id = ?', [roomId]);
     if (!room) {
       return res.status(404).json({ error: '채팅방을 찾을 수 없습니다.' });
@@ -1161,7 +1165,7 @@ app.get('/api/chats/rooms/:roomId/messages', authenticateJWT, async (req, res) =
 
     // 읽음 처리
     await dbRun('UPDATE messages SET is_read = 1 WHERE room_id = ? AND sender_id != ?', [roomId, currentUserId]);
-    
+
     // 메시지 목록 로드
     const messages = await dbAll('SELECT * FROM messages WHERE room_id = ? ORDER BY created_at ASC, id ASC', [roomId]);
     res.json(messages);
@@ -1180,15 +1184,15 @@ app.get('/api/users/:userId/profile', authenticateJWT, async (req, res) => {
              popularity_score, workout_count, received_reviews_count 
       FROM User WHERE userId = ?
     `, [userId]);
-    
+
     if (!user) {
       return res.status(404).json({ error: '유저를 찾을 수 없습니다.' });
     }
-    
+
     if (user.user_gym) {
-      try { user.user_gym = JSON.parse(user.user_gym); } catch (e) {}
+      try { user.user_gym = JSON.parse(user.user_gym); } catch (e) { }
     }
-    
+
     // Get received reviews for this user
     const reviews = await dbAll(`
       SELECT r.*, u.nickname as reviewerNickname, u.profile_image as reviewerAvatar, u.gymName as reviewerGym
@@ -1197,7 +1201,7 @@ app.get('/api/users/:userId/profile', authenticateJWT, async (req, res) => {
       WHERE r.target_user_id = ?
       ORDER BY r.created_at DESC
     `, [userId]);
-    
+
     res.json({ user, reviews });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1209,32 +1213,32 @@ app.post('/api/chats/rooms/:roomId/leave', authenticateJWT, async (req, res) => 
   try {
     const roomId = req.params.roomId;
     const currentUserId = req.user.userId;
-    
+
     const room = await dbGet('SELECT * FROM chat_rooms WHERE id = ?', [roomId]);
     if (!room) {
       return res.status(404).json({ error: '채팅방을 찾을 수 없습니다.' });
     }
-    
+
     if (room.owner_id !== currentUserId && room.participant_id !== currentUserId) {
       return res.status(403).json({ error: '권한이 없습니다.' });
     }
-    
+
     let isOwner = room.owner_id === currentUserId;
     if (isOwner) {
       await dbRun('UPDATE chat_rooms SET owner_left = 1 WHERE id = ?', [roomId]);
     } else {
       await dbRun('UPDATE chat_rooms SET participant_left = 1 WHERE id = ?', [roomId]);
     }
-    
+
     const leavingUser = await dbGet('SELECT nickname, userId FROM User WHERE userId = ?', [currentUserId]);
     const nameToDisplay = leavingUser.nickname || leavingUser.userId;
     const systemMsgContent = `${nameToDisplay}님이 채팅방을 나갔습니다.`;
-    
+
     await dbRun(
       'INSERT INTO messages (room_id, sender_id, message, is_read) VALUES (?, "system", ?, 0)',
       [roomId, systemMsgContent]
     );
-    
+
     // Emit system message to socket room
     io.to(`room_${roomId}`).emit('receive_message', {
       id: Date.now(),
@@ -1244,7 +1248,7 @@ app.post('/api/chats/rooms/:roomId/leave', authenticateJWT, async (req, res) => 
       created_at: new Date().toISOString(),
       is_read: 0
     });
-    
+
     const updatedRoom = await dbGet('SELECT * FROM chat_rooms WHERE id = ?', [roomId]);
     if (updatedRoom.owner_left === 1 && updatedRoom.participant_left === 1) {
       // Both left, clean up
@@ -1256,7 +1260,7 @@ app.post('/api/chats/rooms/:roomId/leave', authenticateJWT, async (req, res) => 
       const targetId = isOwner ? room.participant_id : room.owner_id;
       io.to(`user_${targetId}`).emit('partner_left', { room_id: roomId });
     }
-    
+
     res.json({ success: true, message: '채팅방을 나갔습니다.' });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1290,9 +1294,9 @@ app.post('/api/chats/rooms/:roomId/workout', authenticateJWT, async (req, res) =
     // 상대방 알림 전송
     const targetId = room.owner_id === currentUserId ? room.participant_id : room.owner_id;
     await createNotification(
-      targetId, 
-      '운동예정', 
-      '새 운동 약속 생성', 
+      targetId,
+      '운동예정',
+      '새 운동 약속 생성',
       `${currentUserId}님이 운동 약속(${appointment_date} ${appointment_time})을 생성하셨습니다.`
     );
 
@@ -1336,7 +1340,7 @@ app.post('/api/workout/sessions/:sessionId/complete', authenticateJWT, async (re
     if (updatedSession.owner_completed === 1 && updatedSession.participant_completed === 1) {
       // 둘 다 완료 -> completed
       await dbRun('UPDATE workout_sessions SET status = "completed" WHERE id = ?', [sessionId]);
-      
+
       // 인기도 상승 및 운동 횟수 상승
       await adjustPopularity(session.owner_id, 1);
       await adjustPopularity(session.participant_id, 1);
@@ -1344,15 +1348,15 @@ app.post('/api/workout/sessions/:sessionId/complete', authenticateJWT, async (re
 
       // 알림 발행
       await createNotification(
-        session.owner_id, 
-        '후기작성', 
-        '운동 완료 & 후기 작성', 
+        session.owner_id,
+        '후기작성',
+        '운동 완료 & 후기 작성',
         `'${session.postTitle}' 운동이 완료되었습니다. 파트너에게 후기를 남겨주세요!`
       );
       await createNotification(
-        session.participant_id, 
-        '후기작성', 
-        '운동 완료 & 후기 작성', 
+        session.participant_id,
+        '후기작성',
+        '운동 완료 & 후기 작성',
         `'${session.postTitle}' 운동이 완료되었습니다. 파트너에게 후기를 남겨주세요!`
       );
 
@@ -1362,9 +1366,9 @@ app.post('/api/workout/sessions/:sessionId/complete', authenticateJWT, async (re
       const targetId = isOwner ? session.participant_id : session.owner_id;
       if (val === 1) {
         await createNotification(
-          targetId, 
-          '운동완료요청', 
-          '운동 완료 확인 요청', 
+          targetId,
+          '운동완료요청',
+          '운동 완료 확인 요청',
           `${currentUserId}님이 운동 완료 확인을 요청했습니다. 응답해 주세요.`
         );
       }
@@ -1392,16 +1396,16 @@ app.post('/api/workout/sessions/:sessionId/cancel', authenticateJWT, async (req,
     }
 
     await dbRun('UPDATE workout_sessions SET status = "cancelled" WHERE id = ?', [sessionId]);
-    
+
     // 취소한 사용자 인기도 감점
     await adjustPopularity(currentUserId, -1);
 
     // 상대방에게 취소 알림
     const targetId = session.owner_id === currentUserId ? session.participant_id : session.owner_id;
     await createNotification(
-      targetId, 
-      '노쇼신고결과', 
-      '운동 약속 취소 알림', 
+      targetId,
+      '노쇼신고결과',
+      '운동 약속 취소 알림',
       `${currentUserId}님이 예정된 운동 약속을 취소하셨습니다. 취소자의 인기도가 1점 차감됩니다.`
     );
 
@@ -1585,22 +1589,22 @@ app.post('/api/admin/no-show/:reportId/approve', async (req, res) => {
     }
 
     await dbRun('UPDATE no_show_reports SET status = "approved" WHERE id = ?', [reportId]);
-    
+
     // 피신고자 인기도 15점 대폭 차감
     await adjustPopularity(report.target_user_id, -15);
 
     // 알림 발송
     await createNotification(
-      report.target_user_id, 
-      '노쇼신고결과', 
-      '노쇼 신고 처리 결과 알림', 
+      report.target_user_id,
+      '노쇼신고결과',
+      '노쇼 신고 처리 결과 알림',
       `운동 불참 노쇼 신고가 확인되어 관리자 승인하에 인기도 점수가 15점 감소했습니다.`
     );
 
     await createNotification(
-      report.reporter_id, 
-      '노쇼신고결과', 
-      '노쇼 신고 승인 완료', 
+      report.reporter_id,
+      '노쇼신고결과',
+      '노쇼 신고 승인 완료',
       `접수하신 ${report.target_user_id}님에 대한 노쇼 신고가 승인 완료되었습니다.`
     );
 
