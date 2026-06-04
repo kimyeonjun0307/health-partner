@@ -207,6 +207,9 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = await dbGet('SELECT * FROM User WHERE userId = ?', [userId]);
+
+    console.log("    요청 userId:", userId);
+    console.log("    DB에서 가져온 user:", user);
     if (!user) {
       return res.status(401).json({ error: '존재하지 않는 아이디입니다.' });
     }
