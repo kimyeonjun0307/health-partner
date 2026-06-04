@@ -6,7 +6,7 @@ import RegisterForm from './components/RegisterForm';
 import Dashboard from './components/Dashboard';
 
 // Axios 전역 기본 URL 설정
-axios.defaults.baseURL = 'http://localhost:3000';
+axios.defaults.baseURL = 'https://health-partner-production.up.railway.app/';
 
 function App() {
   const [token, setToken] = useState(null);
