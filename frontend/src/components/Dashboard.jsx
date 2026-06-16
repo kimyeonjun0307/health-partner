@@ -405,8 +405,8 @@ function Dashboard({ token, user: initialUser, onLogout }) {
 
     // Real-time notifications
     newSocket.on('notification', (noti) => {
-      setNotifications(prev => [noti, ...prev]);
-      setUnreadNotiCount(prev => prev + 1);
+      setNotifications(prev => [noti, ...(Array.isArray(prev) ? prev : [])]);
+      setUnreadNotiCount(prev => (typeof prev === 'number' ? prev + 1 : 1));
     });
 
     // Real-time message alerts
@@ -506,8 +506,8 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   const handleMarkNotificationRead = async (notiId) => {
     try {
       await axios.put(`/api/notifications/${notiId}/read`);
-      setNotifications(prev => prev.map(n => n.id === notiId ? { ...n, is_read: 1 } : n));
-      setUnreadNotiCount(prev => Math.max(0, prev - 1));
+      setNotifications(prev => (Array.isArray(prev) ? prev.map(n => n.id === notiId ? { ...n, is_read: 1 } : n) : []));
+      setUnreadNotiCount(prev => Math.max(0, (typeof prev === 'number' ? prev : 0) - 1));
     } catch (err) {
       console.error('Failed to mark notification read:', err.message);
     }
@@ -1013,10 +1013,10 @@ function Dashboard({ token, user: initialUser, onLogout }) {
                     </button>
                   </div>
                  <div className="notification-list">
-  {notifications.length === 0 ? (
+  {(notifications?.length ?? 0) === 0 ? (
     <div className="no-notifications">새로운 알림이 없습니다.</div>
   ) : (
-    notifications.map(noti => (
+    (Array.isArray(notifications) ? notifications : []).map(noti => (
       <div
         key={noti.id}
         className={`notification-item ${noti.is_read === 0 ? 'unread' : ''}`}
