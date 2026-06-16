@@ -399,7 +399,7 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   useEffect(() => {
     if (!currentUser || !currentUser.userId) return;
 
-    const socketUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    const socketUrl = import.meta.env.VITE_API_URL || 'https://health-partner-production.up.railway.app';
     const newSocket = io(socketUrl, {
       query: { userId: currentUser.userId }
     });

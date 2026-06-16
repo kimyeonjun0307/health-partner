@@ -14,14 +14,27 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: ALLOWED_ORIGIN,
-    methods: ['GET', 'POST']
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
   }
 });
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'gym_partner_secret_key_9988';
 
 app.use(cors({
-  origin: ALLOWED_ORIGIN
+  origin: ALLOWED_ORIGIN,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
+app.options('*', cors({
+  origin: ALLOWED_ORIGIN,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
