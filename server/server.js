@@ -872,7 +872,7 @@ app.get('/api/users/me/bookmarks', authenticateJWT, async (req, res) => {
       ORDER BY b.created_at DESC
     `, [currentUserId, user.user_region]);
 
-    res.json(posts);
+    res.json(Array.isArray(posts) ? posts : []);
   } catch (err) {
     sendError(res, err)
   }
@@ -1042,7 +1042,7 @@ app.get('/api/users/me/applications', authenticateJWT, async (req, res) => {
       ORDER BY a.created_at DESC
     `, [currentUserId]);
 
-    res.json(applications);
+    res.json(Array.isArray(applications) ? applications : []);
   } catch (err) {
     sendError(res, err)
   }
@@ -1057,7 +1057,7 @@ app.get('/api/users/me/posts', authenticateJWT, async (req, res) => {
       WHERE authorId = ?
       ORDER BY postId DESC
     `, [currentUserId]);
-    res.json(posts);
+    res.json(Array.isArray(posts) ? posts : []);
   } catch (err) {
     sendError(res, err)
   }
@@ -1461,7 +1461,7 @@ app.get('/api/users/me/workouts', authenticateJWT, async (req, res) => {
       ORDER BY ws.appointment_date DESC, ws.appointment_time DESC
     `, [currentUserId, currentUserId, currentUserId]);
 
-    res.json(workouts);
+    res.json(Array.isArray(workouts) ? workouts : []);
   } catch (err) {
     sendError(res, err)
   }
@@ -1542,7 +1542,7 @@ app.get('/api/users/me/reviews/received', authenticateJWT, async (req, res) => {
       WHERE r.target_user_id = ?
       ORDER BY r.created_at DESC
     `, [currentUserId]);
-    res.json(list);
+    res.json(Array.isArray(list) ? list : []);
   } catch (err) {
     sendError(res, err)
   }
@@ -1559,7 +1559,7 @@ app.get('/api/users/me/reviews/written', authenticateJWT, async (req, res) => {
       WHERE r.reviewer_id = ?
       ORDER BY r.created_at DESC
     `, [currentUserId]);
-    res.json(list);
+    res.json(Array.isArray(list) ? list : []);
   } catch (err) {
     sendError(res, err)
   }
