@@ -143,6 +143,7 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   const [postToDeleteId, setPostToDeleteId] = useState(null);
   const profileDropdownRef = useRef(null);
 
+
   // Sync profile editing fields when currentUser changes
   useEffect(() => {
     if (currentUser) {
@@ -475,11 +476,30 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   const fetchNotifications = async () => {
     try {
       const res = await axios.get('/api/notifications');
-      setNotifications(res.data);
-      const unreadCount = res.data.filter(n => n.is_read === 0).length;
+
+      // Normalize various possible response shapes to an array
+      const raw = res.data;
+      // console.debug('fetchNotifications response:', raw);
+
+      let data = [];
+      if (Array.isArray(raw)) {
+        data = raw;
+      } else if (Array.isArray(raw?.data)) {
+        data = raw.data;
+      } else if (Array.isArray(raw?.notifications)) {
+        data = raw.notifications;
+      } else {
+        data = [];
+      }
+
+      setNotifications(data);
+
+      const unreadCount = Array.isArray(data)
+        ? data.filter(n => n?.is_read === 0).length
+        : 0;
       setUnreadNotiCount(unreadCount);
     } catch (err) {
-      console.error('Failed to fetch notifications:', err.message);
+      console.error('Failed to fetch notifications:', err?.message || err);
     }
   };
 
@@ -992,22 +1012,24 @@ function Dashboard({ token, user: initialUser, onLogout }) {
                       닫기
                     </button>
                   </div>
-                  <div className="notification-list">
-                    {notifications.length === 0 ? (
-                      <div className="no-notifications">새로운 알림이 없습니다.</div>
-                    ) : (
-                      notifications.map(noti => (
-                        <div 
-                          key={noti.id} 
-                          className={`notification-item ${noti.is_read === 0 ? 'unread' : ''}`}
-                          onClick={() => handleMarkNotificationRead(noti.id)}
-                        >
-                          <div className="notification-content">{noti.content}</div>
-                          <div className="notification-time">{new Date(noti.created_at).toLocaleString()}</div>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                 <div className="notification-list">
+  {notifications.length === 0 ? (
+    <div className="no-notifications">새로운 알림이 없습니다.</div>
+  ) : (
+    notifications.map(noti => (
+      <div
+        key={noti.id}
+        className={`notification-item ${noti.is_read === 0 ? 'unread' : ''}`}
+        onClick={() => handleMarkNotificationRead(noti.id)}
+      >
+        <div className="notification-content">{noti.content}</div>
+        <div className="notification-time">
+          {new Date(noti.created_at).toLocaleString()}
+        </div>
+      </div>
+    ))
+  )}
+</div>
                 </div>
               )}
             </div>
