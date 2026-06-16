@@ -165,7 +165,12 @@ function Dashboard({ token, user: initialUser, onLogout }) {
     }
     try {
       const res = await axios.get(`/api/users/${userId}/profile`);
-      setViewingProfileUser(res.data);
+      // API 응답이 필요한 필드를 포함하도록 보장
+      const profileData = {
+        ...res.data,
+        reviews: res.data.reviews || []
+      };
+      setViewingProfileUser(profileData);
       setViewingProfileUserId(userId);
     } catch (err) {
       alert(err.response?.data?.error || err.message);
@@ -516,7 +521,7 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   const fetchRooms = async () => {
     try {
       const res = await axios.get('/api/chats/rooms');
-      setRooms(res.data);
+      setRooms(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Failed to fetch rooms:', err.message);
     }
@@ -526,7 +531,7 @@ function Dashboard({ token, user: initialUser, onLogout }) {
     setActiveRoom(room);
     try {
       const res = await axios.get(`/api/chats/rooms/${room.id}/messages`);
-      setMessages(res.data);
+      setMessages(Array.isArray(res.data) ? res.data : []);
       fetchRooms(); // Refresh to clear unread counts
       fetchWorkouts();
       fetchWrittenReviews();
@@ -552,7 +557,7 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   const fetchWorkouts = async () => {
     try {
       const res = await axios.get('/api/users/me/workouts');
-      setWorkouts(res.data);
+      setWorkouts(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Failed to fetch workouts:', err.message);
     }
@@ -635,7 +640,7 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   const fetchWrittenReviews = async () => {
     try {
       const res = await axios.get('/api/users/me/reviews/written');
-      setWrittenReviews(res.data);
+      setWrittenReviews(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Failed to fetch written reviews:', err.message);
     }
@@ -644,7 +649,7 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   const fetchReceivedReviews = async () => {
     try {
       const res = await axios.get('/api/users/me/reviews/received');
-      setReceivedReviews(res.data);
+      setReceivedReviews(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Failed to fetch received reviews:', err.message);
     }
@@ -716,7 +721,8 @@ function Dashboard({ token, user: initialUser, onLogout }) {
           sortBy: sortBy
         }
       });
-      setPosts(response.data.posts);
+      // API 응답이 posts 배열을 포함하도록 보장
+      setPosts(response.data.posts || []);
       if (response.data.currentUser) {
         setCurrentUser(response.data.currentUser);
       }
@@ -733,10 +739,16 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   const fetchPostDetail = async (postId) => {
     try {
       const response = await axios.get(`/api/posts/${postId}`);
-      setPostDetail(response.data);
+      // API 응답이 필요한 필드를 포함하도록 보장
+      const postData = {
+        ...response.data,
+        comments: response.data.comments || [],
+        applications: response.data.applications || []
+      };
+      setPostDetail(postData);
       // 기본 보조자 선택을 댓글 단 유저 중 첫 번째 유저로 세팅
-      if (response.data.comments && response.data.comments.length > 0) {
-        setSelectedAssistantId(response.data.comments[0].user_id || '');
+      if (postData.comments && postData.comments.length > 0) {
+        setSelectedAssistantId(postData.comments[0].user_id || '');
       } else {
         setSelectedAssistantId('');
       }
@@ -931,13 +943,13 @@ function Dashboard({ token, user: initialUser, onLogout }) {
     try {
       if (mypageSubTab === 'written') {
         const res = await axios.get('/api/users/me/posts');
-        setMyWrittenPosts(res.data);
+        setMyWrittenPosts(Array.isArray(res.data) ? res.data : []);
       } else if (mypageSubTab === 'applied') {
         const res = await axios.get('/api/users/me/applications');
-        setMyAppliedPosts(res.data);
+        setMyAppliedPosts(Array.isArray(res.data) ? res.data : []);
       } else if (mypageSubTab === 'bookmarked') {
         const res = await axios.get('/api/users/me/bookmarks');
-        setMyBookmarkedPosts(res.data);
+        setMyBookmarkedPosts(Array.isArray(res.data) ? res.data : []);
       } else if (mypageSubTab === 'received_reviews') {
         fetchReceivedReviews();
       } else if (mypageSubTab === 'written_reviews') {
@@ -1415,7 +1427,7 @@ function Dashboard({ token, user: initialUser, onLogout }) {
                       <h4 style={{ fontSize: '14px', color: 'white', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         🤝 파트너 참가 신청
                       </h4>
-                      {postDetail.applications && postDetail.applications.length > 0 ? (
+                      {(postDetail?.applications?.length || 0) > 0 ? (
                         // 이미 신청 완료한 경우 상태 표시
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
                           <span style={{ fontSize: '13px', color: '#9ca3af' }}>내 신청 상태:</span>
@@ -1450,13 +1462,13 @@ function Dashboard({ token, user: initialUser, onLogout }) {
                     // 2) 내가 작성한 글인 경우: 들어온 참가 신청 목록
                     <div style={{ padding: '16px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '8px' }}>
                       <h4 style={{ fontSize: '14px', color: 'white', marginBottom: '8px' }}>
-                        📥 들어온 신청 내역 ({postDetail.applications ? postDetail.applications.length : 0})
+                        📥 들어온 신청 내역 ({postDetail?.applications?.length || 0})
                       </h4>
-                      {!postDetail.applications || postDetail.applications.length === 0 ? (
+                      {(postDetail?.applications?.length || 0) === 0 ? (
                         <p style={{ fontSize: '12px', color: '#9ca3af' }}>아직 들어온 신청이 없습니다.</p>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
-                          {postDetail.applications.map(app => (
+                          {(postDetail?.applications || []).map(app => (
                             <div key={app.id} style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#9ca3af', marginBottom: '4px' }}>
                                 <strong>{app.applicant_id}</strong> (삼대 {app.applicantThreeLiftWeight}kg)
@@ -1497,15 +1509,15 @@ function Dashboard({ token, user: initialUser, onLogout }) {
 
                   {/* 댓글/대댓글 피드 */}
                   <div className="comment-section" style={{ marginTop: '8px' }}>
-                    <h4 className="comment-title">댓글 ({postDetail.comments.length})</h4>
+                    <h4 className="comment-title">댓글 ({postDetail?.comments?.length || 0})</h4>
                     
                     <div className="comment-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      {postDetail.comments.length === 0 ? (
+                      {(postDetail?.comments?.length || 0) === 0 ? (
                         <p style={{ fontSize: '13px', color: 'var(--text-dark)', padding: '10px 0' }}>
                           댓글이 없습니다. 첫 댓글을 남겨보세요!
                         </p>
                       ) : (
-                        postDetail.comments.filter(c => !c.parent_comment_id).map((comment) => (
+                        (postDetail?.comments || []).filter(c => !c.parent_comment_id).map((comment) => (
                           <div key={comment.id} style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                             {/* 부모 댓글 */}
                             <div className="comment-item" style={{ borderLeft: '3px solid var(--primary)', paddingLeft: '10px', background: 'rgba(255,255,255,0.02)' }}>
@@ -1563,7 +1575,7 @@ function Dashboard({ token, user: initialUser, onLogout }) {
                             )}
 
                             {/* 자식 대댓글 목록 */}
-                            {postDetail.comments.filter(child => child.parent_comment_id === comment.id).map(childComment => (
+                            {(postDetail?.comments || []).filter(child => child.parent_comment_id === comment.id).map(childComment => (
                               <div key={childComment.id} className="comment-item" style={{ marginLeft: '24px', borderLeft: '2px dashed rgba(255,255,255,0.2)', paddingLeft: '10px', background: 'rgba(255,255,255,0.01)' }}>
                                 <div className="comment-author-bar" style={{ display: 'flex', justifyContent: 'space-between' }}>
                                   <span style={{ fontWeight: '600', color: 'white' }}>
@@ -2743,12 +2755,12 @@ function Dashboard({ token, user: initialUser, onLogout }) {
             </div>
 
             <div className="profile-section">
-              <h4 className="profile-section-title">받은 후기 ({viewingProfileUser.reviews.length})</h4>
+              <h4 className="profile-section-title">받은 후기 ({viewingProfileUser?.reviews?.length || 0})</h4>
               <div className="profile-reviews-preview" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                {viewingProfileUser.reviews.length === 0 ? (
+                {(viewingProfileUser?.reviews?.length || 0) === 0 ? (
                   <p className="profile-reviews-empty">아직 작성된 후기가 없습니다.</p>
                 ) : (
-                  viewingProfileUser.reviews.map(rev => (
+                  (viewingProfileUser?.reviews || []).map(rev => (
                     <div key={rev.id} className="profile-review-quote">
                       <p>"{rev.content}"</p>
                       <span className="profile-review-meta">
