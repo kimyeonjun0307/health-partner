@@ -345,9 +345,11 @@ function Dashboard({ token, user: initialUser, onLogout }) {
     setGymSearching(true);
     try {
       const response = await axios.get(`/api/gyms/search?query=${encodeURIComponent(gymSearchQuery)}`);
-      setGymSearchResults(response.data);
-      if (response.data.length > 0) {
-        setSelectedGym(response.data[0]);
+      // API 응답이 배열인지 객체인지 확인
+      const results = Array.isArray(response.data) ? response.data : (response.data?.gyms || []);
+      setGymSearchResults(results);
+      if (results && results.length > 0) {
+        setSelectedGym(results[0]);
       } else {
         setSelectedGym(null);
       }
@@ -682,7 +684,7 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   const fetchNoShowReports = async () => {
     try {
       const res = await axios.get('/api/admin/no-show');
-      setNoShowReports(res.data);
+      setNoShowReports(Array.isArray(res.data) ? res.data : (res.data?.reports || []));
     } catch (err) {
       console.error('Failed to fetch no-show reports:', err.message);
     }

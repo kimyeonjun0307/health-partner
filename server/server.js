@@ -477,7 +477,7 @@ app.get('/api/gyms/search', authenticateJWT, async (req, res) => {
       });
     }
 
-    res.json(gymList);
+    res.json(Array.isArray(gymList) ? gymList : []);
   } catch (err) {
     sendError(res, err)
   }
@@ -701,7 +701,7 @@ app.get('/api/posts', authenticateJWT, async (req, res) => {
         workout_count: user.workout_count,
         received_reviews_count: user.received_reviews_count
       },
-      posts
+      posts: Array.isArray(posts) ? posts : []
     });
   } catch (err) {
     sendError(res, err)
@@ -770,7 +770,7 @@ app.get('/api/posts/:id', authenticateJWT, async (req, res) => {
       `, [postId, currentUserId]);
     }
 
-    res.json({ post, comments, applications });
+    res.json({ post, comments: Array.isArray(comments) ? comments : [], applications: Array.isArray(applications) ? applications : [] });
   } catch (err) {
     sendError(res, err)
   }
@@ -1171,7 +1171,7 @@ app.get('/api/chats/rooms', authenticateJWT, async (req, res) => {
       ORDER BY lastMessageTime DESC, cr.created_at DESC
     `, [currentUserId, currentUserId, currentUserId, currentUserId]);
 
-    res.json(rooms);
+    res.json(Array.isArray(rooms) ? rooms : []);
   } catch (err) {
     sendError(res, err)
   }
@@ -1196,7 +1196,7 @@ app.get('/api/chats/rooms/:roomId/messages', authenticateJWT, async (req, res) =
 
     // 메시지 목록 로드
     const messages = await dbAll('SELECT * FROM messages WHERE room_id = ? ORDER BY created_at ASC, id ASC', [roomId]);
-    res.json(messages);
+    res.json(Array.isArray(messages) ? messages : []);
   } catch (err) {
     sendError(res, err)
   }
@@ -1659,7 +1659,7 @@ app.get('/api/notifications', authenticateJWT, async (req, res) => {
   try {
     const currentUserId = req.user.userId;
     const list = await dbAll('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC', [currentUserId]);
-    res.json(list);
+    res.json(Array.isArray(list) ? list : []);
   } catch (err) {
     sendError(res, err)
   }
