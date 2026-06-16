@@ -6,7 +6,7 @@ import RegisterForm from './components/RegisterForm';
 import Dashboard from './components/Dashboard';
 
 // Axios 전역 기본 URL 설정
-axios.defaults.baseURL = 'https://health-partner-production.up.railway.app/';
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || '';
 
 function App() {
   const [token, setToken] = useState(null);

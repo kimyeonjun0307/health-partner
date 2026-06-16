@@ -61,7 +61,8 @@ async function initDb() {
       squat INTEGER DEFAULT 0,
       deadlift INTEGER DEFAULT 0,
       workout_career TEXT DEFAULT NULL,
-      profile_image TEXT DEFAULT 'avatar1'
+      profile_image TEXT DEFAULT 'avatar1',
+      role TEXT DEFAULT 'user'
     )
   `);
 
@@ -232,6 +233,7 @@ async function initDb() {
     const hasDeadlift = userColumns.some(c => c.name === 'deadlift');
     const hasWorkoutCareer = userColumns.some(c => c.name === 'workout_career');
     const hasProfileImage = userColumns.some(c => c.name === 'profile_image');
+    const hasRole = userColumns.some(c => c.name === 'role');
 
     if (!hasRegion) await dbRun("ALTER TABLE User ADD COLUMN user_region TEXT DEFAULT NULL");
     if (!hasGym) await dbRun("ALTER TABLE User ADD COLUMN user_gym TEXT DEFAULT NULL");
@@ -246,6 +248,7 @@ async function initDb() {
     if (!hasDeadlift) await dbRun("ALTER TABLE User ADD COLUMN deadlift INTEGER DEFAULT 0");
     if (!hasWorkoutCareer) await dbRun("ALTER TABLE User ADD COLUMN workout_career TEXT DEFAULT NULL");
     if (!hasProfileImage) await dbRun("ALTER TABLE User ADD COLUMN profile_image TEXT DEFAULT 'avatar1'");
+    if (!hasRole) await dbRun("ALTER TABLE User ADD COLUMN role TEXT DEFAULT 'user'");
 
     console.log('User table schema migrated.');
   } catch (err) {
@@ -318,8 +321,8 @@ async function initDb() {
 
     for (const u of users) {
       await dbRun(
-        'INSERT INTO User (userId, password, gymName, threeLiftWeight, preferredWorkoutTime, points, user_region, user_gym, user_lat, user_lng, popularity_score, workout_count, received_reviews_count, nickname, bench_press, squat, deadlift, workout_career, profile_image) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [u.id, u.password, u.gym, u.weight, u.time, u.points, u.region, u.gymInfo, u.lat, u.lng, u.popularity, u.workouts, u.reviews, u.nickname, u.bench, u.squat, u.deadlift, u.career, u.avatar]
+        'INSERT INTO User (userId, password, gymName, threeLiftWeight, preferredWorkoutTime, points, user_region, user_gym, user_lat, user_lng, popularity_score, workout_count, received_reviews_count, nickname, bench_press, squat, deadlift, workout_career, profile_image, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [u.id, u.password, u.gym, u.weight, u.time, u.points, u.region, u.gymInfo, u.lat, u.lng, u.popularity, u.workouts, u.reviews, u.nickname, u.bench, u.squat, u.deadlift, u.career, u.avatar, u.role || 'user']
       );
     }
   } else {
@@ -372,6 +375,28 @@ async function initDb() {
       x: 126.9230,
       y: 37.5530
     })]);
+
+    // Ensure admin user exists in DB
+    try {
+      const checkAdmin = await dbGet("SELECT userId FROM User WHERE userId = 'admin'");
+      if (!checkAdmin) {
+        console.log('Seeding admin user...');
+        const defaultPasswordHash = bcrypt.hashSync('password123', 10);
+        const defaultGym = JSON.stringify({
+          id: "gym_1",
+          name: "마블 피트니스 우동점",
+          address: "부산 해운대구 우동 123",
+          x: 129.1633519,
+          y: 35.1593306
+        });
+        await dbRun(
+          'INSERT INTO User (userId, password, gymName, threeLiftWeight, preferredWorkoutTime, points, user_region, user_gym, user_lat, user_lng, popularity_score, workout_count, received_reviews_count, nickname, bench_press, squat, deadlift, workout_career, profile_image, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          ['admin', defaultPasswordHash, '마블 피트니스 우동점', 500, '18:00', 1000, '우동', defaultGym, 35.1593306, 129.1633519, 999, 100, 50, '관리자', 150, 170, 180, '10년', 'avatar1', 'admin']
+        );
+      }
+    } catch (err) {
+      console.error('Error seeding/checking admin user:', err.message);
+    }
   }
 
   const postCount = await dbGet('SELECT COUNT(*) as count FROM Post');

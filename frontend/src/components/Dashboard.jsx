@@ -137,6 +137,12 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   const [showChatMenu, setShowChatMenu] = useState(false);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
 
+  // Profile dropdown and post deletion states
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showDeletePostModal, setShowDeletePostModal] = useState(false);
+  const [postToDeleteId, setPostToDeleteId] = useState(null);
+  const profileDropdownRef = useRef(null);
+
   // Sync profile editing fields when currentUser changes
   useEffect(() => {
     if (currentUser) {
@@ -209,6 +215,23 @@ function Dashboard({ token, user: initialUser, onLogout }) {
     }
   };
 
+  // Delete a post
+  const handleDeletePost = async () => {
+    if (!postToDeleteId) return;
+    try {
+      const res = await axios.delete(`/api/posts/${postToDeleteId}`);
+      alert(res.data.message);
+      setShowDeletePostModal(false);
+      setPostToDeleteId(null);
+      setRightPanelMode(null);
+      setSelectedPostId(null);
+      setPostDetail(null);
+      fetchPosts(); // Refresh post list
+    } catch (err) {
+      alert(err.response?.data?.error || '게시글 삭제에 실패했습니다.');
+    }
+  };
+
   // Refresh current user profile data (popularity, review counts, etc.)
   const refreshCurrentUser = async () => {
     try {
@@ -249,6 +272,18 @@ function Dashboard({ token, user: initialUser, onLogout }) {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showChatMenu]);
+
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    if (!showProfileDropdown) return;
+    const handleClickOutside = (e) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target)) {
+        setShowProfileDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showProfileDropdown]);
 
   // GPS 기반 동네 인증 처리
   const handleCertifyLocation = () => {
@@ -356,7 +391,8 @@ function Dashboard({ token, user: initialUser, onLogout }) {
   useEffect(() => {
     if (!currentUser || !currentUser.userId) return;
 
-    const newSocket = io('https://health-partner-production.up.railway.app/', {
+    const socketUrl = import.meta.env.VITE_API_URL || window.location.origin;
+    const newSocket = io(socketUrl, {
       query: { userId: currentUser.userId }
     });
 
@@ -976,40 +1012,72 @@ function Dashboard({ token, user: initialUser, onLogout }) {
               )}
             </div>
 
-            {currentUser.user_region && (
-              <div className="user-badge region" style={{ borderColor: 'rgba(16, 185, 129, 0.3)', color: 'var(--primary)' }}>
-                📍 {currentUser.user_region}
+            {/* Profile Dropdown Container */}
+            <div className="profile-dropdown-container" ref={profileDropdownRef}>
+              <div 
+                className="profile-trigger" 
+                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+              >
+                {renderAvatar(currentUser.profile_image, '32px', '16px')}
+                <span className="profile-trigger-nickname">{currentUser.nickname || currentUser.userId}</span>
+                <span className={`profile-trigger-arrow ${showProfileDropdown ? 'open' : ''}`}>▾</span>
               </div>
-            )}
-            <div className="user-badge font-semibold" style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }} onClick={() => setActiveTab('mypage')}>
-              {renderAvatar(currentUser.profile_image, '22px', '12px')}
-              <span>{currentUser.nickname || currentUser.userId}</span>
-            </div>
-            <div className="user-badge gym">
-              💪 {currentUser.gymName || '헬스장 미등록'}
-            </div>
-            <div className="user-badge weight" style={{ display: 'flex', flexDirection: 'column', gap: '1px', fontSize: '11px', lineHeight: '1.2', padding: '4px 10px' }}>
-              <div>🏋️ 삼대 {currentUser.threeLiftWeight}kg</div>
-              <div style={{ fontSize: '9px', opacity: 0.7 }}>B:{currentUser.bench_press || 0} S:{currentUser.squat || 0} D:{currentUser.deadlift || 0}</div>
-            </div>
-            <div className="user-badge points">
-              🔥 {currentUser.points} P
-            </div>
 
-            {/* 관리자 모드 토글 스위치 */}
-            <div className="toggle-container" onClick={() => {
-              setAdminMode(!adminMode);
-              if (!adminMode) {
-                fetchNoShowReports();
-              }
-            }} style={{ border: adminMode ? '1px solid var(--danger)' : '1px solid rgba(255,255,255,0.05)' }}>
-              <div className={`toggle-switch ${adminMode ? 'active' : ''}`} style={{ background: adminMode ? 'var(--danger)' : '#475569' }}>
-                <div className="toggle-circle"></div>
-              </div>
-              <span className="toggle-label" style={{ color: adminMode ? '#fca5a5' : 'var(--text-muted)' }}>관리자 모드</span>
-            </div>
+              {showProfileDropdown && (
+                <div className="profile-dropdown-menu">
+                  <div className="profile-dropdown-header">
+                    <div className="profile-dropdown-userinfo">
+                      <span className="profile-dropdown-name">{currentUser.nickname || currentUser.userId}</span>
+                      {currentUser.user_region && (
+                        <span className="profile-dropdown-region">📍 {currentUser.user_region}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="profile-dropdown-details">
+                    <div className="profile-dropdown-item">
+                      <span className="label">소속 헬스장</span>
+                      <span className="val">{currentUser.gymName || '헬스장 미등록'}</span>
+                    </div>
+                    <div className="profile-dropdown-item">
+                      <span className="label">3대 운동 기록</span>
+                      <span className="val">🏋️ {currentUser.threeLiftWeight}kg</span>
+                    </div>
+                    <div className="profile-dropdown-subitem">
+                      B:{currentUser.bench_press || 0} S:{currentUser.squat || 0} D:{currentUser.deadlift || 0}
+                    </div>
+                    <div className="profile-dropdown-item">
+                      <span className="label">보유 포인트</span>
+                      <span className="val">🔥 {currentUser.points} P</span>
+                    </div>
+                  </div>
 
-            <button className="logout-btn" onClick={onLogout}>로그아웃</button>
+                  {/* 관리자 모드 토글 (admin 전용) */}
+                  {currentUser.role === 'admin' && (
+                    <div className="profile-dropdown-admin">
+                      <div 
+                        className="toggle-container" 
+                        onClick={() => {
+                          setAdminMode(!adminMode);
+                          if (!adminMode) {
+                            fetchNoShowReports();
+                          }
+                        }}
+                        style={{ border: adminMode ? '1px solid var(--danger)' : '1px solid rgba(255,255,255,0.05)', width: '100%', justifyContent: 'space-between', padding: '6px 10px', marginTop: '4px', marginBottom: '4px' }}
+                      >
+                        <span className="toggle-label" style={{ color: adminMode ? '#fca5a5' : 'var(--text-muted)', fontSize: '12px' }}>관리자 모드</span>
+                        <div className={`toggle-switch ${adminMode ? 'active' : ''}`} style={{ background: adminMode ? 'var(--danger)' : '#475569' }}>
+                          <div className="toggle-circle"></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="profile-dropdown-footer">
+                    <button className="logout-btn-dropdown" onClick={onLogout}>로그아웃</button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -1235,7 +1303,31 @@ function Dashboard({ token, user: initialUser, onLogout }) {
                       </span>
                       <h3>{postDetail.post.title}</h3>
                     </div>
-                    <button className="close-panel-btn" onClick={() => setRightPanelMode(null)}>✕</button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {(postDetail.post.authorId === currentUser.userId || currentUser.role === 'admin') && (
+                        <button 
+                          className="delete-post-btn"
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            color: '#f87171',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            padding: '4px 10px',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                            transition: 'all 0.2s'
+                          }}
+                          onClick={() => {
+                            setPostToDeleteId(postDetail.post.postId);
+                            setShowDeletePostModal(true);
+                          }}
+                        >
+                          삭제
+                        </button>
+                      )}
+                      <button className="close-panel-btn" onClick={() => setRightPanelMode(null)}>✕</button>
+                    </div>
                   </div>
 
                   {/* 작성자 정보 및 찜 버튼 */}
@@ -2645,6 +2737,28 @@ function Dashboard({ token, user: initialUser, onLogout }) {
                   ))
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. 게시글 삭제 확인 모달 */}
+      {showDeletePostModal && (
+        <div className="guard-overlay" style={{ zIndex: 200 }} onClick={() => { setShowDeletePostModal(false); setPostToDeleteId(null); }}>
+          <div className="guard-card" style={{ maxWidth: '400px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="guard-icon" style={{ color: '#ef4444' }}>⚠️</div>
+            <h3 className="guard-title" style={{ color: '#fca5a5' }}>게시글 삭제</h3>
+            <p className="guard-desc">
+              정말 이 게시글을 삭제하시겠습니까?<br />
+              삭제된 게시글은 다시 복구할 수 없습니다.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <button className="btn" style={{ flex: 1 }} onClick={() => { setShowDeletePostModal(false); setPostToDeleteId(null); }}>
+                취소
+              </button>
+              <button className="btn" style={{ flex: 1, background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.4)' }} onClick={handleDeletePost}>
+                삭제하기
+              </button>
             </div>
           </div>
         </div>

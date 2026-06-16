@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
@@ -8,20 +9,31 @@ const { Server } = require('socket.io');
 const { initDb, dbRun, dbGet, dbAll } = require('./db');
 
 const app = express();
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: ALLOWED_ORIGIN,
     methods: ['GET', 'POST']
   }
 });
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'gym_partner_secret_key_9988';
 
-app.use(cors());
+app.use(cors({
+  origin: ALLOWED_ORIGIN
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
+
+// Centralized error responder helper to prevent leaking stack traces or inner details in production
+function sendError(res, err, status = 500) {
+  console.error("Error encountered:", err);
+  const isProduction = process.env.NODE_ENV === 'production';
+  const message = isProduction ? '서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.' : err.message;
+  res.status(status).json({ error: message });
+}
 
 // Helper to convert "HH:MM" to minutes
 function timeToMinutes(timeStr) {
@@ -169,6 +181,15 @@ function authenticateJWT(req, res, next) {
   }
 }
 
+// Admin Authorization Middleware
+function authorizeAdmin(req, res, next) {
+  if (req.user && req.user.role === 'admin') {
+    next();
+  } else {
+    return res.status(403).json({ error: '관리자 권한이 필요합니다.' });
+  }
+}
+
 // ----------------- AUTH & USER ROUTES -----------------
 
 // 회원 가입
@@ -192,13 +213,13 @@ app.post('/api/auth/register', async (req, res) => {
     const defaultSquat = Math.floor(Number(threeLiftWeight) / 3);
     const defaultDeadlift = Number(threeLiftWeight) - defaultBench - defaultSquat;
     await dbRun(
-      'INSERT INTO User (userId, password, gymName, threeLiftWeight, preferredWorkoutTime, points, nickname, bench_press, squat, deadlift, workout_career, profile_image) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, "미입력", "avatar1")',
+      'INSERT INTO User (userId, password, gymName, threeLiftWeight, preferredWorkoutTime, points, nickname, bench_press, squat, deadlift, workout_career, profile_image, role) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, "미입력", "avatar1", "user")',
       [userId, hashedPassword, gymName, Number(threeLiftWeight), preferredWorkoutTime, userId, defaultBench, defaultSquat, defaultDeadlift]
     );
 
     res.status(201).json({ success: true, message: '회원가입이 완료되었습니다.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -225,7 +246,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // 토큰 생성
     const token = jwt.sign(
-      { userId: user.userId, gymName: user.gymName },
+      { userId: user.userId, gymName: user.gymName, role: user.role },
       JWT_SECRET,
       { expiresIn: '3h' }
     );
@@ -237,7 +258,7 @@ app.post('/api/auth/login', async (req, res) => {
       user: userWithoutPassword
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -291,7 +312,7 @@ async function getRegionFromCoordsOrAddress(lat, lng, address) {
 app.get('/api/auth/me', authenticateJWT, async (req, res) => {
   try {
     const user = await dbGet(
-      'SELECT userId, gymName, threeLiftWeight, preferredWorkoutTime, points, user_region, user_gym, user_lat, user_lng, popularity_score, workout_count, received_reviews_count, nickname, bench_press, squat, deadlift, workout_career, profile_image FROM User WHERE userId = ?',
+      'SELECT userId, gymName, threeLiftWeight, preferredWorkoutTime, points, user_region, user_gym, user_lat, user_lng, popularity_score, workout_count, received_reviews_count, nickname, bench_press, squat, deadlift, workout_career, profile_image, role FROM User WHERE userId = ?',
       [req.user.userId]
     );
     if (!user) {
@@ -307,7 +328,7 @@ app.get('/api/auth/me', authenticateJWT, async (req, res) => {
     }
     res.json(user);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -344,7 +365,7 @@ app.post('/api/region/authenticate', authenticateJWT, async (req, res) => {
       user: updatedUser
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -458,7 +479,7 @@ app.get('/api/gyms/search', authenticateJWT, async (req, res) => {
 
     res.json(gymList);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -495,7 +516,7 @@ app.post('/api/users/gym', authenticateJWT, async (req, res) => {
       user: updatedUser
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -505,7 +526,7 @@ app.get('/api/users', authenticateJWT, async (req, res) => {
     const users = await dbAll('SELECT userId, gymName, threeLiftWeight, preferredWorkoutTime, points FROM User');
     res.json(users);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -567,7 +588,7 @@ app.put('/api/users/:id', authenticateJWT, async (req, res) => {
 
     res.json(updatedUser);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -683,7 +704,7 @@ app.get('/api/posts', authenticateJWT, async (req, res) => {
       posts
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -751,7 +772,7 @@ app.get('/api/posts/:id', authenticateJWT, async (req, res) => {
 
     res.json({ post, comments, applications });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -792,7 +813,7 @@ app.post('/api/posts', authenticateJWT, async (req, res) => {
 
     res.status(201).json({ success: true, postId: result.lastID });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -812,7 +833,7 @@ app.post('/api/posts/:id/bookmark', authenticateJWT, async (req, res) => {
     await dbRun('INSERT INTO bookmarks (user_id, post_id) VALUES (?, ?)', [currentUserId, postId]);
     res.json({ success: true, message: '게시글을 찜했습니다.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -825,7 +846,7 @@ app.delete('/api/posts/:id/bookmark', authenticateJWT, async (req, res) => {
     await dbRun('DELETE FROM bookmarks WHERE user_id = ? AND post_id = ?', [currentUserId, postId]);
     res.json({ success: true, message: '찜을 해제했습니다.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -853,7 +874,7 @@ app.get('/api/users/me/bookmarks', authenticateJWT, async (req, res) => {
 
     res.json(posts);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -903,7 +924,7 @@ app.post('/api/posts/:id/apply', authenticateJWT, async (req, res) => {
 
     res.status(201).json({ success: true, message: '참가 신청이 완료되었습니다.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -997,7 +1018,7 @@ app.post('/api/applications/:id/status', authenticateJWT, async (req, res) => {
       res.json({ success: true, message: '신청을 거절했습니다.' });
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1023,7 +1044,7 @@ app.get('/api/users/me/applications', authenticateJWT, async (req, res) => {
 
     res.json(applications);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1038,7 +1059,7 @@ app.get('/api/users/me/posts', authenticateJWT, async (req, res) => {
     `, [currentUserId]);
     res.json(posts);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1069,7 +1090,7 @@ app.post('/api/posts/:id/comments', authenticateJWT, async (req, res) => {
 
     res.status(201).json({ success: true, commentId: result.lastID });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1096,7 +1117,7 @@ app.put('/api/comments/:id', authenticateJWT, async (req, res) => {
     await dbRun('UPDATE Comment SET content = ? WHERE id = ?', [content, commentId]);
     res.json({ success: true, message: '댓글이 수정되었습니다.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1121,7 +1142,7 @@ app.delete('/api/comments/:id', authenticateJWT, async (req, res) => {
 
     res.json({ success: true, message: '댓글이 삭제되었습니다.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1152,7 +1173,7 @@ app.get('/api/chats/rooms', authenticateJWT, async (req, res) => {
 
     res.json(rooms);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1177,7 +1198,7 @@ app.get('/api/chats/rooms/:roomId/messages', authenticateJWT, async (req, res) =
     const messages = await dbAll('SELECT * FROM messages WHERE room_id = ? ORDER BY created_at ASC, id ASC', [roomId]);
     res.json(messages);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1211,7 +1232,7 @@ app.get('/api/users/:userId/profile', authenticateJWT, async (req, res) => {
 
     res.json({ user, reviews });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1270,7 +1291,7 @@ app.post('/api/chats/rooms/:roomId/leave', authenticateJWT, async (req, res) => 
 
     res.json({ success: true, message: '채팅방을 나갔습니다.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1309,7 +1330,7 @@ app.post('/api/chats/rooms/:roomId/workout', authenticateJWT, async (req, res) =
 
     res.status(201).json({ success: true, sessionId });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1382,7 +1403,7 @@ app.post('/api/workout/sessions/:sessionId/complete', authenticateJWT, async (re
       res.json({ success: true, status: 'pending', message: '상대방의 운동 완료 승인을 대기하는 중입니다.' });
     }
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1418,7 +1439,7 @@ app.post('/api/workout/sessions/:sessionId/cancel', authenticateJWT, async (req,
 
     res.json({ success: true, message: '운동 약속을 취소했습니다. 인기도 점수가 1점 감소했습니다.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1442,7 +1463,7 @@ app.get('/api/users/me/workouts', authenticateJWT, async (req, res) => {
 
     res.json(workouts);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1506,7 +1527,7 @@ app.post('/api/workout/sessions/:sessionId/review', authenticateJWT, async (req,
 
     res.json({ success: true, message: '후기 작성이 성공적으로 완료되었습니다.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1523,7 +1544,7 @@ app.get('/api/users/me/reviews/received', authenticateJWT, async (req, res) => {
     `, [currentUserId]);
     res.json(list);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1540,7 +1561,7 @@ app.get('/api/users/me/reviews/written', authenticateJWT, async (req, res) => {
     `, [currentUserId]);
     res.json(list);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1579,12 +1600,12 @@ app.post('/api/workout/sessions/:sessionId/no-show', authenticateJWT, async (req
 
     res.json({ success: true, message: '노쇼 신고가 접수되었습니다. 관리자 승인 시 대상자 인기도가 감소합니다.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
 // 관리자 신고 승인 (인기도 -15점 적용 및 알림 생성)
-app.post('/api/admin/no-show/:reportId/approve', async (req, res) => {
+app.post('/api/admin/no-show/:reportId/approve', authenticateJWT, authorizeAdmin, async (req, res) => {
   try {
     const reportId = req.params.reportId;
     const report = await dbGet('SELECT * FROM no_show_reports WHERE id = ?', [reportId]);
@@ -1610,24 +1631,24 @@ app.post('/api/admin/no-show/:reportId/approve', async (req, res) => {
 
     await createNotification(
       report.reporter_id,
-      '노쇼신고결과',
+      '노쇼신고결결과',
       '노쇼 신고 승인 완료',
       `접수하신 ${report.target_user_id}님에 대한 노쇼 신고가 승인 완료되었습니다.`
     );
 
     res.json({ success: true, message: '노쇼 신고가 승인 완료되었습니다. 대상자 인기도가 15점 차감되었습니다.' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
 // 전체 노쇼 신고 목록 조회 (테스트/관리용)
-app.get('/api/admin/no-show', async (req, res) => {
+app.get('/api/admin/no-show', authenticateJWT, authorizeAdmin, async (req, res) => {
   try {
     const reports = await dbAll('SELECT * FROM no_show_reports ORDER BY created_at DESC');
     res.json(reports);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1640,7 +1661,7 @@ app.get('/api/notifications', authenticateJWT, async (req, res) => {
     const list = await dbAll('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC', [currentUserId]);
     res.json(list);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1652,7 +1673,7 @@ app.put('/api/notifications/:id/read', authenticateJWT, async (req, res) => {
     await dbRun('UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?', [id, currentUserId]);
     res.json({ success: true });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
   }
 });
 
@@ -1699,7 +1720,42 @@ app.post('/api/posts/:id/complete', authenticateJWT, async (req, res) => {
       updatedAssistantPoints: assistant.points + 100
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err)
+  }
+});
+
+// 게시글 삭제 API (작성자 본인 또는 관리자 권한 필요)
+app.delete('/api/posts/:id', authenticateJWT, async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const currentUserId = req.user.userId;
+    const userRole = req.user.role;
+
+    const post = await dbGet('SELECT * FROM Post WHERE postId = ?', [postId]);
+    if (!post) {
+      return res.status(404).json({ error: '게시글을 찾을 수 없습니다.' });
+    }
+
+    // 작성자 본인 혹은 관리자만 삭제 가능
+    if (post.authorId !== currentUserId && userRole !== 'admin') {
+      return res.status(403).json({ error: '삭제 권한이 없습니다.' });
+    }
+
+    // 관련 데이터 삭제
+    const rooms = await dbAll('SELECT id FROM chat_rooms WHERE post_id = ?', [postId]);
+    for (const room of rooms) {
+      await dbRun('DELETE FROM messages WHERE room_id = ?', [room.id]);
+      await dbRun('DELETE FROM workout_sessions WHERE room_id = ?', [room.id]);
+    }
+    await dbRun('DELETE FROM chat_rooms WHERE post_id = ?', [postId]);
+    await dbRun('DELETE FROM bookmarks WHERE post_id = ?', [postId]);
+    await dbRun('DELETE FROM post_applications WHERE post_id = ?', [postId]);
+    await dbRun('DELETE FROM Comment WHERE post_id = ?', [postId]);
+    await dbRun('DELETE FROM Post WHERE postId = ?', [postId]);
+
+    res.json({ success: true, message: '게시글이 성공적으로 삭제되었습니다.' });
+  } catch (err) {
+    sendError(res, err)
   }
 });
 
